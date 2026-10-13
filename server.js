@@ -3987,9 +3987,25 @@ export default {
       env.RAILWAY_TCP_PROXY_PORT || 0
     );
 
-    if (url.pathname === "/") {
-      return new Response("Trendify PasarGuard Gateway OK");
+    if (
+  url.pathname === "/" ||
+  url.pathname === "/health"
+) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      status: "online",
+      gateway: "Trendify Nexus Gateway"
+    }),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
     }
+  );
+}
 
     if (url.pathname !== "/vless") {
       return new Response("Not Found", { status: 404 });
@@ -4229,89 +4245,55 @@ async function getWorkersDevSubdomain() {
    TEST GATEWAY HEALTH
 ========================================================= */
 
-async function testGatewayHealth(
-  workerUrl
-) {
-  const base =
-    String(
-      workerUrl || ""
-    )
-      .trim()
-      .replace(
-        /\/+$/,
-        ""
-      );
+
+async function testGatewayHealth(workerUrl) {
+  const base = String(workerUrl || "")
+    .trim()
+    .replace(/\/+$/, "");
 
   if (!base) {
-    throw new Error(
-      "Gateway worker URL is empty"
-    );
+    throw new Error("Gateway worker URL is empty");
   }
 
-  const started =
-    Date.now();
+  const started = Date.now();
 
-  const response =
-    await fetch(
-      `${base}/health`,
-      {
-        method:
-          "GET",
+  // The new simple Gateway responds on both / and /health.
+  const response = await fetch(`${base}/health`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache"
+    }
+  });
 
-        headers: {
-          Accept:
-            "application/json",
+  const latency = Date.now() - started;
+  const text = await response.text();
 
-          "Cache-Control":
-            "no-cache"
-        }
-      }
-    );
-
-  const latency =
-    Date.now() -
-    started;
-
-  const text =
-    await response.text();
-
-  let data;
+  let data = {};
 
   try {
-    data =
-      text
-        ? JSON.parse(text)
-        : {};
-  } catch {
-    data = {};
-  }
+    data = text ? JSON.parse(text) : {};
+  } catch {}
 
   if (!response.ok) {
     throw new Error(
-      `Gateway health returned HTTP ${response.status}`
+      `Gateway health returned HTTP ${response.status}: ${text}`
     );
   }
 
-  if (
-    data?.success !== true ||
-    data?.status !== "online"
-  ) {
+  if (data?.success !== true) {
     throw new Error(
-      "Gateway health response is invalid"
+      "Gateway health response is invalid: " + text
     );
   }
 
   return {
-    status:
-      "online",
-
-    latency_ms:
-      latency,
-
-    response:
-      data
+    latency_ms: latency,
+    latency,
+    data
   };
 }
+
 
 /* =========================================================
    CREATE CLOUDFLARE GATEWAY
