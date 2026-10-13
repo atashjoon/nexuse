@@ -4813,14 +4813,16 @@ async function deployGatewayWorker({
     );
   }
 
-  const nexusApiUrl =
-    publicBaseUrl();
+ const nexusApiUrl =
+  String(process.env.PUBLIC_URL || "")
+    .trim()
+    .replace(/\/+$/, "");
 
-  if (!nexusApiUrl) {
-    throw new Error(
-      "PUBLIC_URL is required for gateway authentication"
-    );
-  }
+if (!nexusApiUrl) {
+  throw new Error(
+    "PUBLIC_URL is required to deploy a gateway"
+  );
+}
 
   const workerCode =
     getGatewayWorkerCode();
