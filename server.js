@@ -3365,6 +3365,117 @@ app.delete(
   }
 );
 
+```js
+/* =========================================================
+   TELEGRAM BOT API — READ ONLY
+========================================================= */
+
+function botSecretValid(req) {
+  const configured = String(
+    process.env.NEXUS_BOT_SECRET || ""
+  ).trim();
+
+  const supplied = String(
+    req.headers["x-nexus-bot-secret"] || ""
+  ).trim();
+
+  if (!configured || !supplied) return false;
+
+  const a = Buffer.from(configured, "utf8");
+  const b = Buffer.from(supplied, "utf8");
+
+  if (a.length !== b.length) return false;
+
+  return crypto.timingSafeEqual(a, b);
+}
+
+function requireBotSecret(req, res) {
+  if (botSecretValid(req)) return true;
+
+  json(res, {
+    success: false,
+    error: "Unauthorized bot"
+  }, 401);
+
+  return false;
+}
+
+app.get("/api/internal/bot/stats", async (req, res) => {
+  try {
+    if (!requireBotSecret(req, res)) return;
+
+    const stats = await one(`
+      SELECT
+        (SELECT COUNT(*) FROM accounts)::integer AS users,
+        (SELECT COUNT(*) FROM accounts
+          WHERE enabled = TRUE)::integer AS active_users,
+        (SELECT COUNT(*) FROM gateways)::integer AS gateways,
+        (SELECT COUNT(*) FROM gateways
+          WHERE enabled = TRUE
+          AND status = 'online')::integer AS online_gateways,
+        (SELECT COUNT(*) FROM subscriptions
+          WHERE enabled = TRUE)::integer AS subscriptions
+    `);
+
+    return json(res, {
+      success: true,
+      stats: {
+        users: Number(stats.users || 0),
+        active_users: Number(stats.active_users || 0),
+        gateways: Number(stats.gateways || 0),
+        online_gateways: Number(stats.online_gateways || 0),
+        subscriptions: Number(stats.subscriptions || 0)
+      }
+    });
+  } catch (error) {
+    return json(res, {
+      success: false,
+      error: "Could not load statistics"
+    }, 500);
+  }
+});
+
+app.get("/api/internal/bot/users", async (req, res) => {
+  try {
+    if (!requireBotSecret(req, res)) return;
+
+    const users = await many(`
+      SELECT id, username, display_name, enabled,
+             data_limit, data_used, expires_at
+      FROM accounts
+      ORDER BY id DESC
+      LIMIT 10
+    `);
+
+    return json(res, { success: true, users });
+  } catch (error) {
+    return json(res, {
+      success: false,
+      error: "Could not load users"
+    }, 500);
+  }
+});
+
+app.get("/api/internal/bot/gateways", async (req, res) => {
+  try {
+    if (!requireBotSecret(req, res)) return;
+
+    const gateways = await many(`
+      SELECT id, name, region, status, enabled, latency, last_seen
+      FROM gateways
+      ORDER BY id DESC
+    `);
+
+    return json(res, { success: true, gateways });
+  } catch (error) {
+    return json(res, {
+      success: false,
+      error: "Could not load gateways"
+    }, 500);
+  }
+});
+```
+
 /* =========================================================
    GATEWAY SECRET AUTH
 ========================================================= */
@@ -3860,658 +3971,319 @@ import { connect } from "cloudflare:sockets";
 const DEFAULT_REGION = "eu";
 
 function json(data, status = 200) {
-  return new Response(
-    JSON.stringify(data),
-    {
-      status,
-      headers: {
-        "content-type":
-          "application/json; charset=utf-8",
-        "access-control-allow-origin":
-          "*",
-        "cache-control":
-          "no-store"
-      }
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
     }
-  );
+  });
 }
 
 function isWebSocket(request) {
-  return (
-    request.headers
-      .get("Upgrade")
-      ?.toLowerCase() ===
-    "websocket"
-  );
+  return request.headers.get("Upgrade")?.toLowerCase() === "websocket";
+}
+
+function toBytes(data) {
+  if (data instanceof ArrayBuffer) {
+    return Promise.resolve(new Uint8Array(data));
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Promise.resolve(
+      new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+    );
+  }
+
+  if (data instanceof Blob) {
+    return data.arrayBuffer().then(function (buffer) {
+      return new Uint8Array(buffer);
+    });
+  }
+
+  return Promise.reject(new Error("Unsupported WebSocket payload"));
 }
 
 function uuidFromBytes(bytes) {
-  const hex =
-    Array.from(bytes)
-      .map(
-        byte =>
-          byte
-            .toString(16)
-            .padStart(2, "0")
-      )
-      .join("");
-
-  return (
-    hex.slice(0, 8) +
-    "-" +
-    hex.slice(8, 12) +
-    "-" +
-    hex.slice(12, 16) +
-    "-" +
-    hex.slice(16, 20) +
-    "-" +
-    hex.slice(20, 32)
-  );
-}
-
-async function gatewayAuth(
-  uuid,
-  env
-) {
-  const apiUrl =
-    String(
-      env.NEXUS_API_URL || ""
-    )
-      .trim()
-      .replace(/\\/+$/, "");
-
-  const secret =
-    String(
-      env.NEXUS_GATEWAY_SECRET || ""
-    ).trim();
-
-  const gatewayId =
-    String(
-      env.GATEWAY_ID || ""
-    ).trim();
-
-  if (
-    !apiUrl ||
-    !secret ||
-    !gatewayId
-  ) {
-    throw new Error(
-      "Gateway environment is incomplete"
-    );
+  if (bytes.length < 17 || bytes[0] !== 0) {
+    throw new Error("Invalid VLESS handshake");
   }
 
-  const url =
-    apiUrl +
-    "/api/internal/gateway/auth" +
-    "?uuid=" +
-    encodeURIComponent(uuid) +
-    "&gateway_id=" +
-    encodeURIComponent(gatewayId);
+  const hex = Array.from(bytes.slice(1, 17))
+    .map(function (byte) {
+      return byte.toString(16).padStart(2, "0");
+    })
+    .join("");
 
-  const response =
-    await fetch(url, {
-      method: "GET",
-      headers: {
-        "X-Nexus-Gateway-Secret":
-          secret,
-        "Accept":
-          "application/json"
-      }
-    });
+  return hex.slice(0, 8) + "-" +
+    hex.slice(8, 12) + "-" +
+    hex.slice(12, 16) + "-" +
+    hex.slice(16, 20) + "-" +
+    hex.slice(20, 32);
+}
 
-  const text =
-    await response.text();
+async function gatewayAuth(uuid, env) {
+  const apiUrl = String(env.NEXUS_API_URL || "").trim().replace(/\\/+$/, "");
+  const secret = String(env.NEXUS_GATEWAY_SECRET || "").trim();
+  const gatewayId = String(env.GATEWAY_ID || "").trim();
 
+  if (!apiUrl || !secret || !gatewayId) {
+    throw new Error("Gateway authentication settings are missing");
+  }
+
+  const authUrl = new URL(apiUrl + "/api/internal/gateway/auth");
+  authUrl.searchParams.set("uuid", uuid);
+  authUrl.searchParams.set("gateway_id", gatewayId);
+
+  const response = await fetch(authUrl.toString(), {
+    method: "GET",
+    headers: {
+      "X-Nexus-Gateway-Secret": secret,
+      "Accept": "application/json"
+    }
+  });
+
+  const text = await response.text();
   let data = {};
 
   try {
-    data =
-      text
-        ? JSON.parse(text)
-        : {};
-  } catch {
-    data = {};
-  }
+    data = text ? JSON.parse(text) : {};
+  } catch {}
 
-  if (
-    !response.ok ||
-    data.authorized !== true
-  ) {
-    throw new Error(
-      data.error ||
-      "Gateway authorization failed"
-    );
+  if (!response.ok || data.authorized !== true) {
+    throw new Error(data.error || "Gateway authorization failed");
   }
 
   return data;
 }
 
-function parseVLESS(buffer) {
-  const bytes =
-    new Uint8Array(buffer);
-
-  if (bytes.length < 24) {
-    throw new Error(
-      "Invalid VLESS request"
-    );
+async function handleVLESS(request, env) {
+  if (!isWebSocket(request)) {
+    return new Response("WebSocket required", {
+      status: 426,
+      headers: { "Upgrade": "websocket" }
+    });
   }
 
-  if (bytes[0] !== 0) {
-    throw new Error(
-      "Unsupported VLESS version"
-    );
-  }
-
-  const uuid =
-    uuidFromBytes(
-      bytes.slice(1, 17)
-    );
-
-  const optionLength =
-    bytes[17];
-
-  const commandIndex =
-    18 + optionLength;
+  const relayHost = String(env.RAILWAY_TCP_PROXY_DOMAIN || "").trim();
+  const relayPort = Number(env.RAILWAY_TCP_PROXY_PORT || 0);
 
   if (
-    commandIndex + 4 >
-    bytes.length
+    !relayHost ||
+    !Number.isInteger(relayPort) ||
+    relayPort < 1 ||
+    relayPort > 65535
   ) {
-    throw new Error(
-      "Invalid VLESS options"
-    );
+    return new Response("Railway TCP Proxy variables are not configured", {
+      status: 500
+    });
   }
 
-  const command =
-    bytes[commandIndex];
-
-  if (command !== 1) {
-    throw new Error(
-      "Only TCP VLESS is supported"
-    );
-  }
-
-  const port =
-    (
-      bytes[commandIndex + 1] *
-        256
-    ) +
-    bytes[commandIndex + 2];
-
-  const addressType =
-    bytes[commandIndex + 3];
-
-  let offset =
-    commandIndex + 4;
-
-  let address;
-
-  if (addressType === 1) {
-    if (
-      offset + 4 >
-      bytes.length
-    ) {
-      throw new Error(
-        "Invalid IPv4 address"
-      );
-    }
-
-    address =
-      Array.from(
-        bytes.slice(
-          offset,
-          offset + 4
-        )
-      ).join(".");
-
-    offset += 4;
-  }
-
-  else if (addressType === 2) {
-    if (
-      offset >= bytes.length
-    ) {
-      throw new Error(
-        "Invalid domain length"
-      );
-    }
-
-    const length =
-      bytes[offset];
-
-    offset += 1;
-
-    if (
-      offset + length >
-      bytes.length
-    ) {
-      throw new Error(
-        "Invalid domain"
-      );
-    }
-
-    address =
-      new TextDecoder().decode(
-        bytes.slice(
-          offset,
-          offset + length
-        )
-      );
-
-    offset += length;
-  }
-
-  else if (addressType === 3) {
-    if (
-      offset + 16 >
-      bytes.length
-    ) {
-      throw new Error(
-        "Invalid IPv6 address"
-      );
-    }
-
-    const parts = [];
-
-    for (
-      let i = 0;
-      i < 16;
-      i += 2
-    ) {
-      parts.push(
-        (
-          (bytes[offset + i] << 8) |
-          bytes[offset + i + 1]
-        ).toString(16)
-      );
-    }
-
-    address =
-      parts.join(":");
-
-    offset += 16;
-  }
-
-  else {
-    throw new Error(
-      "Unsupported address type"
-    );
-  }
-
-  return {
-    uuid,
-    address,
-    port,
-    payload:
-      bytes.slice(offset)
-  };
-}
-
-function sendVLESSResponseHeader(
-  websocket
-) {
-  websocket.send(
-    new Uint8Array([
-      0,
-      0,
-      0
-    ])
-  );
-}
-
-async function handleVLESS(
-  request,
-  env
-) {
-  if (!isWebSocket(request)) {
-    return new Response(
-      "WebSocket required",
-      {
-        status: 426,
-        headers: {
-          "access-control-allow-origin":
-            "*"
-        }
-      }
-    );
-  }
-
-  const pair =
-    new WebSocketPair();
-
-  const client =
-    pair[0];
-
-  const server =
-    pair[1];
+  const pair = new WebSocketPair();
+  const client = pair[0];
+  const server = pair[1];
 
   server.accept();
+  server.binaryType = "arraybuffer";
 
-  let socket = null;
-  let socketReader = null;
+  let firstMessageReceived = false;
+  let relayReady = false;
   let closed = false;
-  let responseHeaderSent = false;
+  let socket;
+  let reader;
+  let writer;
+  let writeChain = Promise.resolve();
+  const pendingMessages = [];
+
+  let resolveFirst;
+  let rejectFirst;
+
+  const firstMessagePromise = new Promise(function (resolve, reject) {
+    resolveFirst = resolve;
+    rejectFirst = reject;
+  });
+
+  const handshakeTimer = setTimeout(function () {
+    if (!firstMessageReceived) {
+      rejectFirst(new Error("VLESS handshake timeout"));
+    }
+  }, 10000);
 
   function closeAll() {
-    if (closed) {
+    if (closed) return;
+    closed = true;
+    clearTimeout(handshakeTimer);
+
+    try {
+      if (server.readyState === WebSocket.OPEN) {
+        server.close();
+      }
+    } catch {}
+
+    try {
+      if (reader) reader.cancel();
+    } catch {}
+
+    try {
+      if (writer) writer.abort();
+    } catch {}
+
+    try {
+      if (socket) socket.close();
+    } catch {}
+  }
+
+  function queueWrite(data) {
+    writeChain = writeChain.then(async function () {
+      if (closed || !writer) return;
+      await writer.write(await toBytes(data));
+    });
+
+    return writeChain;
+  }
+
+  server.addEventListener("message", function (event) {
+    if (closed) return;
+
+    if (!firstMessageReceived) {
+      firstMessageReceived = true;
+      clearTimeout(handshakeTimer);
+      resolveFirst(event.data);
       return;
     }
 
-    closed = true;
+    if (!relayReady) {
+      pendingMessages.push(event.data);
+      return;
+    }
 
-    try {
-      server.close();
-    } catch {}
+    queueWrite(event.data).catch(closeAll);
+  });
 
-    try {
-      socketReader?.cancel();
-    } catch {}
+  server.addEventListener("close", function () {
+    if (!firstMessageReceived) {
+      rejectFirst(new Error("WebSocket closed before handshake"));
+    }
+    closeAll();
+  });
 
-    try {
-      socket?.close();
-    } catch {}
-  }
+  server.addEventListener("error", function () {
+    if (!firstMessageReceived) {
+      rejectFirst(new Error("WebSocket handshake failed"));
+    }
+    closeAll();
+  });
 
   try {
-    const firstMessage =
-      await new Promise(
-        (resolve, reject) => {
-          let finished = false;
+    const firstMessage = await firstMessagePromise;
+    const firstBytes = await toBytes(firstMessage);
 
-          const timer =
-            setTimeout(
-              () => {
-                if (finished) {
-                  return;
-                }
+    const uuid = uuidFromBytes(firstBytes);
+    await gatewayAuth(uuid, env);
 
-                finished = true;
+    socket = connect({
+      hostname: relayHost,
+      port: relayPort
+    });
 
-                reject(
-                  new Error(
-                    "VLESS handshake timeout"
-                  )
-                );
-              },
-              10000
-            );
+    await socket.opened;
 
-          server.addEventListener(
-            "message",
-            event => {
-              if (finished) {
-                return;
-              }
+    writer = socket.writable.getWriter();
+    reader = socket.readable.getReader();
 
-              finished = true;
-              clearTimeout(timer);
+    // Forward the original VLESS handshake unchanged to Railway.
+    await queueWrite(firstBytes);
 
-              resolve(
-                event.data
-              );
-            },
-            { once: true }
-          );
-
-          server.addEventListener(
-            "close",
-            () => {
-              if (finished) {
-                return;
-              }
-
-              finished = true;
-              clearTimeout(timer);
-
-              reject(
-                new Error(
-                  "WebSocket closed"
-                )
-              );
-            },
-            { once: true }
-          );
-
-          server.addEventListener(
-            "error",
-            () => {
-              if (finished) {
-                return;
-              }
-
-              finished = true;
-              clearTimeout(timer);
-
-              reject(
-                new Error(
-                  "WebSocket error"
-                )
-              );
-            },
-            { once: true }
-          );
-        }
-      );
-
-    if (
-      typeof firstMessage ===
-      "string"
-    ) {
-      throw new Error(
-        "Binary VLESS handshake required"
-      );
+    // Flush any data received while the TCP connection was opening.
+    while (pendingMessages.length > 0) {
+      const message = pendingMessages.shift();
+      await queueWrite(message);
     }
 
-    let buffer;
+    relayReady = true;
 
-    if (
-      firstMessage instanceof
-      ArrayBuffer
-    ) {
-      buffer =
-        firstMessage;
-    }
-
-    else if (
-      ArrayBuffer.isView(
-        firstMessage
-      )
-    ) {
-      buffer =
-        firstMessage.buffer.slice(
-          firstMessage.byteOffset,
-          firstMessage.byteOffset +
-            firstMessage.byteLength
-        );
-    }
-
-    else {
-      throw new Error(
-        "Invalid WebSocket payload"
-      );
-    }
-
-    const parsed =
-      parseVLESS(buffer);
-
-    const auth =
-      await gatewayAuth(
-        parsed.uuid,
-        env
-      );
-
-    if (!auth.authorized) {
-      throw new Error(
-        "Unauthorized"
-      );
-    }
-
-    socket =
-      await connect({
-        hostname:
-          parsed.address,
-        port:
-          parsed.port
-      });
-
-    if (
-      parsed.payload &&
-      parsed.payload.length > 0
-    ) {
-      const writer =
-        socket.writable
-          .getWriter();
-
+    // TCP response -> WebSocket client.
+    (async function () {
       try {
-        await writer.write(
-          parsed.payload
-        );
-      } finally {
-        writer.releaseLock();
-      }
-    }
+        while (!closed) {
+          const result = await reader.read();
 
-    if (!responseHeaderSent) {
-      sendVLESSResponseHeader(
-        server
-      );
-
-      responseHeaderSent = true;
-    }
-
-    server.addEventListener(
-      "message",
-      async event => {
-        if (closed) {
-          return;
-        }
-
-        try {
-          let data;
+          if (result.done) break;
 
           if (
-            event.data instanceof
-            ArrayBuffer
+            result.value &&
+            result.value.byteLength > 0 &&
+            server.readyState === WebSocket.OPEN
           ) {
-            data =
-              new Uint8Array(
-                event.data
-              );
+            server.send(result.value);
           }
-
-          else if (
-            ArrayBuffer.isView(
-              event.data
-            )
-          ) {
-            data =
-              new Uint8Array(
-                event.data.buffer,
-                event.data.byteOffset,
-                event.data.byteLength
-              );
-          }
-
-          else {
-            return;
-          }
-
-          const writer =
-            socket?.writable
-              ?.getWriter();
-
-          if (!writer) {
-            closeAll();
-            return;
-          }
-
-          try {
-            await writer.write(
-              data
-            );
-          } finally {
-            writer.releaseLock();
-          }
-        } catch {
-          closeAll();
         }
+      } catch {
+      } finally {
+        closeAll();
       }
-    );
+    })();
 
-    server.addEventListener(
-      "close",
-      closeAll
-    );
-
-    server.addEventListener(
-      "error",
-      closeAll
-    );
-
-    socketReader =
-      socket.readable
-        .getReader();
-
-    (
-      async () => {
-        try {
-          while (!closed) {
-            const result =
-              await socketReader.read();
-
-            if (result.done) {
-              break;
-            }
-
-            if (
-              result.value &&
-              result.value.byteLength > 0
-            ) {
-              server.send(
-                result.value
-              );
-            }
-          }
-        } catch {
-          closeAll();
-        } finally {
-          try {
-            socketReader.releaseLock();
-          } catch {}
-
-          closeAll();
-        }
-      }
-    )();
-
-    return new Response(
-      null,
-      {
-        status: 101,
-        webSocket: client
-      }
-    );
+    return new Response(null, {
+      status: 101,
+      webSocket: client
+    });
   } catch (error) {
     closeAll();
 
     return new Response(
-      "Gateway error: " +
-        String(
-          error?.message ||
-          error
-        ),
+      "Gateway error: " + String(error && error.message || error),
       {
         status: 502,
         headers: {
-          "content-type":
-            "text/plain; charset=utf-8",
-          "access-control-allow-origin":
-            "*"
+          "content-type": "text/plain; charset=utf-8"
         }
       }
     );
   }
 }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, X-Nexus-Gateway-Secret",
+          "Access-Control-Max-Age": "86400"
+        }
+      });
+    }
+
+    if (url.pathname === "/" || url.pathname === "/health") {
+      return json({
+        success: true,
+        gateway: "Trendify Nexus Gateway",
+        gateway_id: env.GATEWAY_ID || null,
+        region: env.GATEWAY_REGION || DEFAULT_REGION,
+        status: "online",
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (
+      url.pathname === "/ws" ||
+      url.pathname.startsWith("/ws/") ||
+      url.pathname === "/vless"
+    ) {
+      return handleVLESS(request, env);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
+`;
+}
+
 
 /* =========================================================
    WORKER FETCH
@@ -5155,6 +4927,25 @@ async function deployGatewayWorker({
   const workerCode =
     getGatewayWorkerCode();
 
+  
+  const railwayHost =
+    String(process.env.RAILWAY_TCP_PROXY_DOMAIN || "").trim();
+
+  const railwayPort =
+    Number(process.env.RAILWAY_TCP_PROXY_PORT || 0);
+
+  if (
+    !railwayHost ||
+    !Number.isInteger(railwayPort) ||
+    railwayPort < 1 ||
+    railwayPort > 65535
+  ) {
+    throw new Error(
+      "RAILWAY_TCP_PROXY_DOMAIN and RAILWAY_TCP_PROXY_PORT are required"
+    );
+  }
+
+
   /*
    * -------------------------------------------------------
    * CLOUDFLARE MODULE WORKER METADATA
@@ -5200,6 +4991,18 @@ async function deployGatewayWorker({
         type: "secret_text",
         text: gatewaySecret
       }
+      
+      {
+        name: "RAILWAY_TCP_PROXY_DOMAIN",
+        type: "plain_text",
+        text: railwayHost
+      },
+      {
+        name: "RAILWAY_TCP_PROXY_PORT",
+        type: "plain_text",
+        text: String(railwayPort)
+      }
+
     ]
   };
 
@@ -5296,18 +5099,6 @@ async function deployGatewayWorker({
 
   return data;
 }
-
-
-/* =========================================================
-   ENABLE WORKERS.DEV
-========================================================= */
-
-
-/* =========================================================
-   GET CLOUDFLARE WORKERS.DEV SUBDOMAIN
-========================================================= */
-
-
 
 
 /* =========================================================
@@ -5915,4 +5706,3 @@ start().catch(error => {
 
   process.exit(1);
 });
-
