@@ -4009,9 +4009,12 @@ export default {
   );
 }
 
-    if (url.pathname !== "/vless") {
-      return new Response("Not Found", { status: 404 });
-    }
+    if (
+  url.pathname !== "/ws" &&
+  url.pathname !== "/vless"
+) {
+  return new Response("Not Found", { status: 404 });
+}
 
     if (!RAILWAY_HOST || !RAILWAY_PORT) {
       return new Response(
