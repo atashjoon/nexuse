@@ -576,21 +576,27 @@ function getCookie(req, name) {
   return null;
 }
 
+
+
 function isHttpsRequest(req) {
+  if (!req || typeof req !== "object") {
+    return false;
+  }
+
   if (req.secure) {
     return true;
   }
 
-  const forwarded =
-    String(
-      req.headers["x-forwarded-proto"] || ""
-    )
-      .split(",")[0]
-      .trim()
-      .toLowerCase();
+  const forwarded = String(
+    req.headers?.["x-forwarded-proto"] || ""
+  )
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
 
   return forwarded === "https";
 }
+
 
 function setSessionCookie(
   req,
