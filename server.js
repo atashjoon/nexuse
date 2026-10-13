@@ -2374,11 +2374,13 @@ app.get(
         success: true,
 
         subscriptions:
-          subscriptions.map(item => ({
-            ...item,
-            subscription_url:
-              `${base}/sub/${item.token}`
-          }))
+  subscriptions.map(item => ({
+    ...item,
+    subscription_url:
+      `${base}/sub/${item.token}`,
+    url:
+      `${base}/sub/${item.token}`
+  }))
       });
     } catch (error) {
       return json(
