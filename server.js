@@ -4246,6 +4246,7 @@ async function getWorkersDevSubdomain() {
 ========================================================= */
 
 
+
 async function testGatewayHealth(workerUrl) {
   const base = String(workerUrl || "")
     .trim()
@@ -4255,43 +4256,52 @@ async function testGatewayHealth(workerUrl) {
     throw new Error("Gateway worker URL is empty");
   }
 
-  const started = Date.now();
+  let lastError = "Gateway health check failed";
 
-  // The new simple Gateway responds on both / and /health.
-  const response = await fetch(`${base}/health`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      "Cache-Control": "no-cache"
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const started = Date.now();
+
+      const response = await fetch(`${base}/health`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache"
+        },
+        signal: AbortSignal.timeout(10000)
+      });
+
+      const latency = Date.now() - started;
+      const text = await response.text();
+
+      let data = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {}
+
+      if (response.ok && data?.success === true) {
+        return {
+          latency_ms: latency,
+          latency,
+          data
+        };
+      }
+
+      lastError =
+        `Gateway health returned HTTP ${response.status}: ${text}`;
+    } catch (error) {
+      lastError = String(error?.message || error);
     }
-  });
 
-  const latency = Date.now() - started;
-  const text = await response.text();
-
-  let data = {};
-
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {}
-
-  if (!response.ok) {
-    throw new Error(
-      `Gateway health returned HTTP ${response.status}: ${text}`
-    );
+    if (attempt < 5) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 
-  if (data?.success !== true) {
-    throw new Error(
-      "Gateway health response is invalid: " + text
-    );
-  }
-
-  return {
-    latency_ms: latency,
-    latency,
-    data
-  };
+  throw new Error(
+    `Gateway health failed after 5 attempts: ${lastError}`
+  );
 }
 
 
