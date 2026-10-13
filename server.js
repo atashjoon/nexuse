@@ -4967,31 +4967,28 @@ async function deployGatewayWorker({
       region: placement
     },
 
+    
     bindings: [
       {
         name: "GATEWAY_ID",
         type: "plain_text",
         text: String(gatewayId)
       },
-
       {
         name: "GATEWAY_REGION",
         type: "plain_text",
         text: normalizedRegion
       },
-
       {
         name: "NEXUS_API_URL",
         type: "plain_text",
         text: nexusApiUrl
       },
-
       {
         name: "NEXUS_GATEWAY_SECRET",
         type: "secret_text",
         text: gatewaySecret
-      }
-      
+      },
       {
         name: "RAILWAY_TCP_PROXY_DOMAIN",
         type: "plain_text",
@@ -5002,9 +4999,7 @@ async function deployGatewayWorker({
         type: "plain_text",
         text: String(railwayPort)
       }
-
     ]
-  };
 
   /*
    * -------------------------------------------------------
