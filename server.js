@@ -4284,117 +4284,9 @@ export default {
 `;
 }
 
-
-/* =========================================================
-   WORKER FETCH
-========================================================= */
-
-export default {
-  async fetch(
-    request,
-    env
-  ) {
-    const url =
-      new URL(
-        request.url
-      );
-
-    if (
-      request.method ===
-      "OPTIONS"
-    ) {
-      return new Response(
-        null,
-        {
-          status: 204,
-          headers: {
-            "Access-Control-Allow-Origin":
-              "*",
-            "Access-Control-Allow-Methods":
-              "GET,POST,OPTIONS",
-            "Access-Control-Allow-Headers":
-              "Content-Type, X-Nexus-Gateway-Secret",
-            "Access-Control-Max-Age":
-              "86400"
-          }
-        }
-      );
-    }
-
-    if (
-      url.pathname === "/"
-    ) {
-      return json({
-        success: true,
-        gateway:
-          "Trendify Nexus Gateway",
-        gateway_id:
-          env.GATEWAY_ID ||
-          null,
-        region:
-          env.GATEWAY_REGION ||
-          DEFAULT_REGION,
-        status:
-          "online"
-      });
-    }
-
-    if (
-      url.pathname ===
-      "/health"
-    ) {
-      return json({
-        success: true,
-        status:
-          "online",
-        gateway_id:
-          env.GATEWAY_ID ||
-          null,
-        region:
-          env.GATEWAY_REGION ||
-          DEFAULT_REGION,
-        timestamp:
-          new Date().toISOString()
-      });
-    }
-
-    if (
-      url.pathname === "/ws" ||
-      url.pathname.startsWith(
-        "/ws/"
-      )
-    ) {
-      return handleVLESS(
-        request,
-        env
-      );
-    }
-
-    return new Response(
-      "Not Found",
-      {
-        status: 404,
-        headers: {
-          "access-control-allow-origin":
-            "*"
-        }
-      }
-    );
-  }
-};
-`;
-}
-
-/* =========================================================
-   CLOUDFLARE WORKER DEPLOYMENT
-========================================================= */
-
-
-
 /* =========================================================
    ENABLE WORKERS.DEV
 ========================================================= */
-
 async function enableWorkersDev(
   workerName
 ) {
@@ -5000,6 +4892,7 @@ async function deployGatewayWorker({
         text: String(railwayPort)
       }
     ]
+  };
 
   /*
    * -------------------------------------------------------
@@ -5007,8 +4900,7 @@ async function deployGatewayWorker({
    * -------------------------------------------------------
    */
 
-  const form =
-    new FormData();
+  const form =    new FormData();
 
   form.append(
     "metadata",
