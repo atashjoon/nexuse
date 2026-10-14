@@ -3373,7 +3373,7 @@ app.delete(
 
 
 /* =========================================================
-   TELEGRAM BOT API — READ ONLY
+   TELEGRAM BOT API â€” READ ONLY
 ========================================================= */
 
 function botSecretValid(req) {
@@ -4748,7 +4748,7 @@ if (!nexusApiUrl) {
   const workerCode =
     getGatewayWorkerCode();
 
-  
+
   const railwayHost =
     String(process.env.RAILWAY_TCP_PROXY_DOMAIN || "").trim();
 
@@ -4788,7 +4788,7 @@ if (!nexusApiUrl) {
       region: placement
     },
 
-    
+
     bindings: [
       {
         name: "GATEWAY_ID",
