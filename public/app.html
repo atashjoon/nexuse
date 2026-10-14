@@ -849,31 +849,31 @@ tr:last-child td{
                 class="active"
                 data-section="dashboard"
             >
-                ◈ <span>Dashboard</span>
+                â—ˆ <span>Dashboard</span>
             </button>
 
             <button data-section="users">
-                ◉ <span>Users</span>
+                â—‰ <span>Users</span>
             </button>
 
             <button data-section="gateways">
-                ◇ <span>Gateways</span>
+                â—‡ <span>Gateways</span>
             </button>
 
             <button data-section="subscriptions">
-                ◌ <span>Subscriptions</span>
+                â—Œ <span>Subscriptions</span>
             </button>
 
             <button data-section="services">
-                ▣ <span>Services</span>
+                â–£ <span>Services</span>
             </button>
 
             <button data-section="scanner">
-                ⌁ <span>Scanner</span>
+                âŒ <span>Scanner</span>
             </button>
 
             <button data-section="settings">
-                ⚙ <span>Settings</span>
+                âš™ <span>Settings</span>
             </button>
 
         </nav>
@@ -885,7 +885,7 @@ tr:last-child td{
                 class="logout"
                 id="logoutBtn"
             >
-                ⇥ <span>Logout</span>
+                â‡¥ <span>Logout</span>
             </button>
 
         </div>
@@ -1567,7 +1567,7 @@ tr:last-child td{
                 class="modal-close"
                 onclick="closeModal()"
             >
-                ×
+                Ã—
             </button>
 
         </div>
@@ -2228,7 +2228,7 @@ function renderUsers() {
                                     ? formatBytes(
                                         account.data_limit
                                       )
-                                    : "∞"
+                                    : "âˆž"
                             }
                         </td>
 
@@ -2236,7 +2236,7 @@ function renderUsers() {
                             ${
                                 account.device_limit > 0
                                     ? account.device_limit
-                                    : "∞"
+                                    : "âˆž"
                             }
                         </td>
 
@@ -2913,7 +2913,7 @@ function renderGateways() {
                                 gateway.latency_ms !== null
                                     ? gateway.latency_ms +
                                       " ms"
-                                    : "—"
+                                    : "â€”"
                             }
                         </td>
 
@@ -2952,12 +2952,13 @@ function renderGateways() {
                                 ${
                                     gateway.worker_url
                                         ? `
-                                        <button
-                                            class="small-btn"
-                                            onclick="copyText('${escAttr(gateway.worker_url)}')"
-                                        >
-                                            Copy
-                                        </button>
+  <button
+    class="small-btn"
+    onclick="copySubscriptionUrl(this)"
+    data-sub-url="${escAttr(sub.url)}"
+>
+    Copy URL
+</button>
                                         `
                                         : ""
                                 }
@@ -3178,7 +3179,7 @@ async function checkGatewayNow(id) {
         if (data.gateway.status === "online") {
 
             toast(
-                `Gateway online — ${data.gateway.latency_ms} ms`
+                `Gateway online â€” ${data.gateway.latency_ms} ms`
             );
 
         } else {
@@ -4093,14 +4094,14 @@ function renderScanner() {
                                 item.latency_ms !== undefined
                                     ? item.latency_ms +
                                       " ms"
-                                    : "—"
+                                    : "â€”"
                             }
                         </td>
 
                         <td>
                             ${
                                 item.score ??
-                                "—"
+                                "â€”"
                             }
                         </td>
 
@@ -4662,7 +4663,7 @@ function serviceName(
 ) {
 
     if (!id) {
-        return "—";
+        return "â€”";
     }
 
     const service =
@@ -4681,7 +4682,7 @@ function gatewayName(
 ) {
 
     if (!id) {
-        return "—";
+        return "â€”";
     }
 
     const gateway =
@@ -4754,7 +4755,7 @@ function formatDate(
 ) {
 
     if (!value) {
-        return "—";
+        return "â€”";
     }
 
     const date =
@@ -4765,7 +4766,7 @@ function formatDate(
             date.getTime()
         )
     ) {
-        return "—";
+        return "â€”";
     }
 
     return date.toLocaleString();
@@ -4817,30 +4818,40 @@ function toDateTimeLocal(
 }
 
 
-async function copyText(
-    value
-) {
+async function copySubscriptionUrl(button) {
+    const url = button?.getAttribute("data-sub-url")?.trim();
+
+    if (!url) {
+        toast("Subscription URL is empty", "error");
+        return;
+    }
 
     try {
+        const area = document.createElement("textarea");
+        area.value = url;
+        area.readOnly = true;
+        area.style.position = "fixed";
+        area.style.top = "0";
+        area.style.left = "-9999px";
 
-        await navigator.clipboard.writeText(
-            value
-        );
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        area.setSelectionRange(0, area.value.length);
 
-        toast(
-            "Copied to clipboard"
-        );
+        const copied = document.execCommand("copy");
+        area.remove();
 
-    } catch {
+        if (!copied) {
+            throw new Error("Browser copy command failed");
+        }
 
-        toast(
-            "Could not copy",
-            "error"
-        );
+        toast("Copied to clipboard");
+    } catch (error) {
+        console.error("Subscription copy failed:", error);
+        toast("Could not copy URL", "error");
     }
 }
-
-
 /* =========================================================
    BOOT
 ========================================================= */
