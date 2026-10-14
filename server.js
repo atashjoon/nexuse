@@ -4641,7 +4641,7 @@ async function enableWorkersDev(workerName) {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`,
     {
-      method: "PUT",
+      method: "POST",
       headers: {
         Authorization: `Bearer ${cfToken}`,
         "Content-Type": "application/json"
@@ -4870,7 +4870,7 @@ if (!nexusApiUrl) {
     await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${workerName}`,
       {
-        method: "PUT",
+        method: "POST",
 
         headers: {
           Authorization:
