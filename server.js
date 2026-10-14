@@ -4867,10 +4867,10 @@ if (!nexusApiUrl) {
    */
 
   const response =
-    await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${workerName}`,
-      {
-        method: "POST",
+  await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`,
+    {
+      method: "PUT",
 
         headers: {
           Authorization:
