@@ -4002,6 +4002,11 @@ function uuidFromBytes(bytes) {
 
 function parseVless(buffer) {
   if (buffer.length < 18) return null;
+  console.error("[Gateway Deploy] Cloudflare response:", {
+  status: response.status,
+  errors: data?.errors || null,
+  success: data?.success
+});
 
   const version = buffer[0];
   if (version !== 0) throw new Error("Unsupported VLESS version");
@@ -4651,6 +4656,11 @@ async function enableWorkersDev(workerName) {
   );
 
   const data = await response.json().catch(() => ({}));
+  console.error("[workers.dev] Cloudflare response:", {
+  status: response.status,
+  errors: data?.errors || null,
+  success: data?.success
+});
 
   if (!response.ok || data.success === false) {
     throw new Error(
