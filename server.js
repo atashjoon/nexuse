@@ -4626,6 +4626,60 @@ app.post(
     }
   }
 );
+/* =========================================================
+   ENABLE WORKERS.DEV
+========================================================= */
+
+async function enableWorkersDev(workerName) {
+  const accountId = String(process.env.CF_ACCOUNT_ID || "").trim();
+  const cfToken = String(process.env.CF_TOKEN || "").trim();
+
+  if (!accountId || !cfToken) {
+    throw new Error("CF_ACCOUNT_ID or CF_TOKEN is not configured");
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${cfToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ enabled: true })
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.success === false) {
+    throw new Error(
+      data.errors?.map(e => e.message).filter(Boolean).join(", ") ||
+      `Cloudflare workers.dev error: ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+/* =========================================================
+   GET WORKERS.DEV SUBDOMAIN
+========================================================= */
+
+async function getWorkersDevSubdomain() {
+  const accountId = String(process.env.CF_ACCOUNT_ID || "").trim();
+
+  if (!accountId) {
+    throw new Error("CF_ACCOUNT_ID is not configured");
+  }
+
+  const data = await cloudflareRequest(
+    `/accounts/${accountId}/workers/subdomain`,
+    { method: "GET" }
+  );
+
+  return data?.result?.subdomain || data?.result?.name || "";
+}
 
 /* =========================================================
    CLOUDFLARE WORKER DEPLOYMENT
