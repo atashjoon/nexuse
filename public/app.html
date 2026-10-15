@@ -3388,14 +3388,12 @@ function renderSubscriptions() {
                         </td>
 
                         <td>
-                            <div
-                                class="table-sub"
-                                ${esc(sub.subscription_url)}
-                            >
-                               esc(sub.subscription_url)
-                                )}
-                            </div>
-                        </td>
+    <div
+        class="table-sub"
+        title="${escAttr(sub.subscription_url || "")}"
+        style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+    >${esc(sub.subscription_url || "")}</div>
+</td>
 
                         <td>
                             <div class="row-actions">
