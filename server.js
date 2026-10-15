@@ -4002,12 +4002,7 @@ function uuidFromBytes(bytes) {
 
 function parseVless(buffer) {
   if (buffer.length < 18) return null;
-  console.error("[Gateway Deploy] Cloudflare response:", {
-  status: response.status,
-  errors: data?.errors || null,
-  success: data?.success
-});
-
+  
   const version = buffer[0];
   if (version !== 0) throw new Error("Unsupported VLESS version");
 
@@ -4894,6 +4889,14 @@ if (!nexusApiUrl) {
     };
   }
 
+  
+  console.error("[Gateway Deploy] Cloudflare response:", {
+    status: response.status,
+    errors: data?.errors || null,
+    success: data?.success,
+    messages: data?.messages || null
+  });
+
   if (
     !response.ok ||
     data.success === false
@@ -4901,13 +4904,12 @@ if (!nexusApiUrl) {
     throw new Error(
       `Cloudflare Worker deployment failed: ${
         data?.errors
-          ? JSON.stringify(
-              data.errors
-            )
+          ? JSON.stringify(data.errors)
           : text
       }`
     );
   }
+
 
   console.log(
     `[Gateway] Worker deployed successfully: ${workerName} (${normalizedRegion})`
