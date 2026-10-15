@@ -843,40 +843,39 @@ tr:last-child td{
         </div>
 
 
-        <nav class="nav">
+        
+<nav class="nav">
 
-            <button
-                class="active"
-                data-section="dashboard"
-            >
-                â—ˆ <span>Dashboard</span>
-            </button>
+    <button class="active" data-section="dashboard">
+        <span>&#9638;</span> <span>Dashboard</span>
+    </button>
 
-            <button data-section="users">
-                â—‰ <span>Users</span>
-            </button>
+    <button data-section="users">
+        <span>&#9787;</span> <span>Users</span>
+    </button>
 
-            <button data-section="gateways">
-                â—‡ <span>Gateways</span>
-            </button>
+    <button data-section="gateways">
+        <span>&#9673;</span> <span>Gateways</span>
+    </button>
 
-            <button data-section="subscriptions">
-                â—Œ <span>Subscriptions</span>
-            </button>
+    <button data-section="subscriptions">
+        <span>&#9776;</span> <span>Subscriptions</span>
+    </button>
 
-            <button data-section="services">
-                â–£ <span>Services</span>
-            </button>
+    <button data-section="services">
+        <span>&#9881;</span> <span>Services</span>
+    </button>
 
-            <button data-section="scanner">
-                âŒ <span>Scanner</span>
-            </button>
+    <button data-section="scanner">
+        <span>&#9906;</span> <span>Scanner</span>
+    </button>
 
-            <button data-section="settings">
-                âš™ <span>Settings</span>
-            </button>
+    <button data-section="settings">
+        <span>&#9881;</span> <span>Settings</span>
+    </button>
 
-        </nav>
+</nav>
+
 
 
         <div class="sidebar-bottom">
@@ -3390,12 +3389,13 @@ function renderSubscriptions() {
                         <td>
                             <div class="row-actions">
 
-                                <button
-                                    class="small-btn"
-                                    onclick="copyText('${escAttr(sub.url)}')"
-                                >
-                                    Copy URL
-                                </button>
+<button
+    class="small-btn"
+    onclick="copySubscriptionUrl(this)"
+    data-sub-url="${escAttr(sub.url)}"
+>
+    Copy URL
+</button>
 
                                 <button
                                     class="small-btn"
