@@ -2242,28 +2242,25 @@ function renderUsers() {
                             )}
                         </td>
 
-                        <td>
-                            ${formatBytes(
-                                account.data_used
-                            )}
-                            /
-                            ${
-                                account.data_limit > 0
-                                    ? formatBytes(
-                                        account.data_limit
-                                      )
-                                    : "âˆž"
-                            }
-                        </td>
+                        ```html
+<td>
+    ${formatBytes(account.data_used)}
+    /
+    ${
+        account.data_limit > 0
+            ? formatBytes(account.data_limit)
+            : "∞"
+    }
+</td>
 
-                        <td>
-                            ${
-                                account.device_limit > 0
-                                    ? account.device_limit
-                                    : "âˆž"
-                            }
-                        </td>
-
+<td>
+    ${
+        account.device_limit > 0
+            ? account.device_limit
+            : "∞"
+    }
+</td>
+```
                         <td>
                             ${
                                 account.expires_at
