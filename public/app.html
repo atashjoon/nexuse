@@ -2397,11 +2397,11 @@ function openUserModal(
 ) {
 
     const account =
-        id
-            ? state.accounts.find(
-                x => x.id === id
-              )
-            : null;
+    id !== null && id !== undefined
+        ? state.accounts.find(
+            x => String(x.id) === String(id)
+          )
+        : null;
 
     state.editingUser =
         account;
