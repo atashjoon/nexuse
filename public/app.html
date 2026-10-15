@@ -703,60 +703,85 @@ tr:last-child td{
     }
 }
 
-@media(max-width:800px){
-    .sidebar{
-        width:70px;
-        padding:16px 8px;
+@media (max-width: 800px) {
+    .sidebar {
+        width: 72px;
+        min-width: 72px;
+        box-sizing: border-box;
+        padding: 16px 8px;
+        overflow: visible;
     }
 
-    .sidebar-brand{
-        padding:4px 5px 20px;
+    .sidebar-brand {
+        padding: 4px 0 20px;
+    }
+
+    .sidebar-brand .logo {
+        justify-content: center;
     }
 
     .sidebar-brand .brand-text,
     .sidebar-brand small,
     .nav button span,
-    .logout span{
-        display:none;
+    .logout span {
+        display: none !important;
     }
 
-    .nav button{
-        text-align:center;
-        padding:12px 6px;
+    .nav {
+        gap: 8px;
     }
 
-    .sidebar-bottom{
-        left:8px;
-        right:8px;
+    .nav button {
+        width: 100%;
+        min-height: 46px;
+        box-sizing: border-box;
+        padding: 10px 4px;
+        text-align: center;
+        font-size: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .content{
-        padding:18px;
+    .nav button::before {
+        font-size: 21px;
+        line-height: 1;
     }
 
-    .topbar{
-        padding:0 18px;
+    .nav button[data-section="dashboard"]::before { content: "⌂"; }
+    .nav button[data-section="users"]::before { content: "♙"; }
+    .nav button[data-section="gateways"]::before { content: "⇄"; }
+    .nav button[data-section="subscriptions"]::before { content: "▤"; }
+    .nav button[data-section="services"]::before { content: "⚙"; }
+    .nav button[data-section="scanner"]::before { content: "⌕"; }
+    .nav button[data-section="settings"]::before { content: "☷"; }
+
+    .nav button.active {
+        box-shadow: inset 3px 0 0 var(--accent);
     }
 
-    .stats-grid{
-        grid-template-columns:
-            repeat(2,minmax(0,1fr));
+    .sidebar-bottom {
+        left: 8px;
+        right: 8px;
     }
 
-    .grid-2,
-    .grid-3{
-        grid-template-columns:1fr;
-    }
-}
-
-@media(max-width:520px){
-    .stats-grid{
-        grid-template-columns:1fr;
+    .logout {
+        width: 100%;
+        min-height: 44px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 0;
     }
 
-    .section-header{
-        align-items:flex-start;
-        flex-direction:column;
+    .logout::before {
+        content: "↪";
+        font-size: 22px;
+    }
+
+    .main {
+        min-width: 0;
+        width: calc(100% - 72px);
     }
 }
 </style>
