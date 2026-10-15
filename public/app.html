@@ -2948,20 +2948,7 @@ function renderGateways() {
                                     }
                                 </button>
 
-                                ${
-                                    gateway.worker_url
-                                        ? `
-  <button
-    class="small-btn"
-    onclick="copySubscriptionUrl(this)"
-    data-sub-url="${escAttr(sub.subscription_url)}"
->
-    Copy URL
-</button>
-                                        `
-                                        : ""
-                                }
-
+                                
                                 <button
                                     class="small-btn"
                                     onclick="deleteGateway(${gateway.id})"
@@ -3378,10 +3365,9 @@ function renderSubscriptions() {
                         <td>
                             <div
                                 class="table-sub"
-                                title="${esc(sub.url)}"
+                                ${esc(sub.subscription_url)}
                             >
-                                ${esc(
-                                    sub.url
+                               esc(sub.subscription_url)
                                 )}
                             </div>
                         </td>
@@ -3392,7 +3378,7 @@ function renderSubscriptions() {
 <button
     class="small-btn"
     onclick="copySubscriptionUrl(this)"
-    data-sub-url="${escAttr(sub.url)}"
+    data-sub-url="${escAttr(sub.subscription_url)}"
 >
     Copy URL
 </button>
